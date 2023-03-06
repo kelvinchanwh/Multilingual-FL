@@ -278,11 +278,17 @@ class RayClient(fl.client.NumPyClient):
 
         # determine device
         cuda_available = torch.cuda.is_available()
-        device_str = f"cuda:0" if cuda_available else "cpu" # CUDA zero defaults to CUDA_VISIBLE_DEVICES
+        mps_available = torch.backends.mps.is_available()
+        if cuda_available:
+            device_str = f"cuda:0" 
+        elif mps_available:
+            device_str = f"mps"
+        else:
+            device_str = f"cpu" # CUDA zero defaults to CUDA_VISIBLE_DEVICES
         self.device = torch.device(device_str)
         
         
-    def get_parameters(self):
+    def get_parameters(self, config):
         return [val.cpu().numpy() for _, val in self.net.state_dict().items()]
 
     def get_properties(self, ins):
@@ -330,7 +336,7 @@ class RayClient(fl.client.NumPyClient):
             raise e
 
         # return local model and statistics
-        return self.get_parameters(), len(trainloader.dataset), {}
+        return self.get_parameters(self.device), len(trainloader.dataset), {}
 
     def evaluate(self, parameters, config):
         global tokenizer
@@ -378,7 +384,7 @@ class TopItem:
         return f"Score: {self.score} at Path: {self.path}"
 
 
-def set_weights(model: torch.nn.ModuleList, weights: fl.common.Weights) -> None:
+def set_weights(model: torch.nn.ModuleList, weights: fl.common.NDArray) -> None:
     """Set model weights from a list of NumPy ndarrays."""
     state_dict = OrderedDict(
         {
@@ -391,10 +397,10 @@ def set_weights(model: torch.nn.ModuleList, weights: fl.common.Weights) -> None:
 
 def get_eval_fn(
     testset, lang_mix: float
-) -> Callable[[fl.common.Weights], Optional[Tuple[float, float]]]:
+) -> Callable[[fl.common.NDArray], Optional[Tuple[float, float]]]:
     """Return an evaluation function for centralized evaluation."""
 
-    def evaluate(weights: fl.common.Weights) -> Optional[Tuple[float, float]]:
+    def evaluate(server_round, weights: fl.common.NDArray, dictionary) -> Optional[Tuple[float, float]]:
         """Use the entire test set for evaluation."""
         global CUDA_COUNT
         global BATCH_SIZE
@@ -417,12 +423,15 @@ def get_eval_fn(
         
         set_weights(model, weights)
 
-        # determine device        
-        if os.environ.get("CUDA_VISIBLE_DEVICES") is None:
-            cuda_is_available = False
+        # determine device
+        cuda_available = torch.cuda.is_available()
+        mps_available = torch.backends.mps.is_available()
+        if cuda_available:
+            device_str = f"cuda:0" 
+        elif mps_available:
+            device_str = f"mps"
         else:
-            cuda_is_available = torch.cuda.is_available()
-        device_str = f"cuda:{GPU_MAPPING['server']}" if cuda_is_available else "cpu"
+            device_str = f"cpu" # CUDA zero defaults to CUDA_VISIBLE_DEVICES
 
         device = torch.device(device_str)
         model.to(device)
@@ -594,17 +603,20 @@ if __name__ == "__main__":
         if num_rounds == 0:
             GPU_MAPPING["server"] = 0
         else:
-            if N_GPUS < 2 and num_rounds != 0:
-                print(f"Given N_GPUs={N_GPUS}, need 2+ for client(s) and server to have separate GPUs. Use CPU instead otherwise")
-                exit(1)
-            num_iter_for_epoch = pool_size // (N_GPUS-1) if pool_size % (N_GPUS - 1) == 0 else (pool_size // (N_GPUS-1)) + 1
+            # if N_GPUS < 2 and num_rounds != 0:
+            #     print(f"Given N_GPUs={N_GPUS}, need 2+ for client(s) and server to have separate GPUs. Use CPU instead otherwise")
+            #     exit(1)
+            num_iter_for_epoch = pool_size // (N_GPUS) if pool_size % (N_GPUS) == 0 else (pool_size // (N_GPUS)) + 1
             args_parsed.frac_fit = 1 / num_iter_for_epoch
             # TODO implement fractional GPU options if desired
             num_rounds = int(num_rounds * num_iter_for_epoch)
             client_resources["num_gpus"] = 1.0
             print(f"Using 1 GPU per client with {args_parsed.frac_fit} clients sampled per round out of {pool_size} clients")
 
-            gpus = os.environ.get("CUDA_VISIBLE_DEVICES").split(",")
+            if torch.cuda.is_available():
+                gpus = os.environ.get("CUDA_VISIBLE_DEVICES").split(",")
+            elif torch.backends.mps.is_built():
+                gpus = [0]
             num_of_gpus_per_round = int(pool_size // num_iter_for_epoch)
             NUM_SKIP_EVAL = num_iter_for_epoch
             GPU_MAPPING["server"] = len(gpus) - 1
@@ -643,7 +655,7 @@ if __name__ == "__main__":
         min_fit_clients=1,
         min_available_clients=pool_size,  # All clients should be available
         on_fit_config_fn=fit_config,
-        eval_fn=get_eval_fn(testset, args_parsed.lang_mix if not args_parsed.centralized else "central"),  # centralised testset evaluation of global model
+        evaluate_fn=get_eval_fn(testset, args_parsed.lang_mix if not args_parsed.centralized else "central"),  # centralised testset evaluation of global model
     )
 
     def client_fn(cid: str, optimizers=ALL_OPTIMIZERS):
@@ -675,7 +687,7 @@ if __name__ == "__main__":
         client_fn=client_fn,
         num_clients=pool_size,
         client_resources=client_resources,
-        num_rounds=num_rounds,
+        config=fl.server.ServerConfig(num_rounds=num_rounds),
         strategy=strategy,
         ray_init_args=ray_config,
     )
