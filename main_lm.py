@@ -71,7 +71,7 @@ from dataset_utils import (
 
 from constants import *
 
-BIG_FILE_CACHE = "./cache"
+BIG_FILE_CACHE = os.path.join(os.getcwd, "cache")
 
 ## Global Vars that are set under `if __name__ == "__main__"`
 ACCUM_STEPS = 1
