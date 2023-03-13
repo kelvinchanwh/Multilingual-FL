@@ -11,3 +11,6 @@ saved_objects/*
 saved_objects*
 *.json
 venv/
+cache/
+data/
+create_data/
