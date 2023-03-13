@@ -1,0 +1,13 @@
+numpy==1.24.2
+pandas==1.5.3
+matplotlib==3.7.1
+transformers==4.26.1
+datasets==2.10.1
+scikit-learn==1.2.2
+sentencepiece==0.1.97
+sacrebleu==2.3.1
+seaborn==0.12.2
+gdown==4.6.4
+flwr==1.0.0
+torch==1.13.1+cu116
+torchvision==0.14.1+cu116

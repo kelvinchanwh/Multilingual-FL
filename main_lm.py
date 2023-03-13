@@ -121,11 +121,11 @@ def train(net, trainloader, epochs, optimizer, device: str, cid: str = "", get_a
             label_ids = label_ids.cpu()
             attn_mask = attn_mask.cpu()
 
-            if get_accuracy:
-                pred_labels = output.logits.argmax(dim=-1).cpu()
-                truth_labels = label_ids.squeeze(-1).cpu()
-                correct += torch.sum(torch.eq(pred_labels, truth_labels)).cpu().detach().item()
-                total += len(pred_labels)
+            # if get_accuracy:
+            pred_labels = output.logits.argmax(dim=-1).cpu()
+            truth_labels = label_ids.squeeze(-1).cpu()
+            correct += torch.sum(torch.eq(pred_labels, truth_labels)).cpu().detach().item()
+            total += len(pred_labels)
 
             if (batch_idx + 1) % ACCUM_STEPS == 0:  
                 optimizer.step()
@@ -139,8 +139,8 @@ def train(net, trainloader, epochs, optimizer, device: str, cid: str = "", get_a
     label_ids = label_ids.to("cpu")
     attn_mask = attn_mask.to("cpu")
     mean_loss = torch.cat(losses).mean()
-    if get_accuracy:
-        print(f"TRAIN Accuracy for is {correct/total}")
+    # if get_accuracy:
+    print(f"TRAIN Accuracy for is {correct/total}")
     print(f"Got a TRAIN PPL value of {mean_loss.detach().item()} and {torch.exp(mean_loss).detach().item()} \
             for cid={cid}, label={batch['langs'][0].item()}")
 
@@ -162,11 +162,11 @@ def test(net, testloader, device: str, get_accuracy: bool = False):
             label_ids = label_ids.to(device)
             x = {"input_ids": input_ids, "labels": label_ids, "attention_mask": attn_mask}
             output = net(**x)
-            if get_accuracy:
-                pred_labels = output.logits.argmax(dim=-1).cpu()
-                truth_labels = label_ids.squeeze(-1).cpu()
-                correct += torch.sum(torch.eq(pred_labels, truth_labels)).item()
-                total += len(pred_labels)
+            # if get_accuracy:
+            pred_labels = output.logits.argmax(dim=-1).cpu()
+            truth_labels = label_ids.squeeze(-1).cpu()
+            correct += torch.sum(torch.eq(pred_labels, truth_labels)).item()
+            total += len(pred_labels)
             loss = output.loss
             try:
                 assert len(set(batch["langs"].numpy().tolist())) == 1, set(batch["langs"].numpy().tolist())
@@ -175,7 +175,7 @@ def test(net, testloader, device: str, get_accuracy: bool = False):
                     labels_to_accuracies[batch["langs"][0].item()]["correct"] = 0
                     labels_to_accuracies[batch["langs"][0].item()]["total"] = 0
                 labels_to_accuracies[batch["langs"][0].item()]["correct"] += torch.sum(torch.eq(pred_labels, truth_labels)).item()
-                labels_to_accuracies[batch["langs"][0].item()]["total"] += len(pred_labels)
+                labels_to_accuracies[batch["langs"][0].item()]["total"] += len(testloader.dataset)
             except Exception as e:
                 print(f"Cant make lang ppls unless entire batch is the same: use a round num for batch size: {e}")
             losses.append(loss.repeat(len(batch)))
@@ -187,8 +187,8 @@ def test(net, testloader, device: str, get_accuracy: bool = False):
         print(f"For EVAL Label {label} the average PPL is {np.exp(np.mean(labels_to_losses[label]))}")
         print(f"For EVAL Label {label} the average accuracy is {labels_to_accuracies[label]['correct'] / labels_to_accuracies[label]['total']}")
     net = net.to("cpu")
-    if get_accuracy:
-        print(f"EVAL Accuracy is {correct/total}")
+    # if get_accuracy:
+    print(f"EVAL Accuracy is {correct/total}")
     label_ids = label_ids.to("cpu")
     label_ids = label_ids.to("cpu")
     attn_mask = attn_mask.to("cpu")
