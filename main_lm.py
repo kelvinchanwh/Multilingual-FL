@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Dict, Callable, Optional, Tuple
 import traceback
 import tqdm
+import json
+import datetime
 
 import math
 import bisect
@@ -92,6 +94,11 @@ CACHE_STR = None
 ALL_OPTIMIZERS = {}
 TOP_N_SCORES = []
 GLOBAL_LANG_MAP = None
+
+def save_history(hist, name):
+  time = int(datetime.now(datetime.timezone.utc).timestamp())
+  with open( BIG_FILE_CACHE / "histories" / f"hist_{time}_{name}.json", "w", encoding="utf-8") as f:
+            json.dump(hist.__dict__, f, ensure_ascii=False, indent=4)
 
 # borrowed from Pytorch quickstart example
 def train(net, trainloader, epochs, optimizer, device: str, cid: str = "", get_accuracy: bool = False):
@@ -682,8 +689,11 @@ if __name__ == "__main__":
     # (optional) specify ray config
     ray_config = {"include_dashboard": False}
 
+    np.random.seed(seed_val)
+    torch.manual_seed(seed_val)
+    random.seed(seed_val)
     # start simulation
-    fl.simulation.start_simulation(
+    hist = fl.simulation.start_simulation(
         client_fn=client_fn,
         num_clients=pool_size,
         client_resources=client_resources,
@@ -691,3 +701,5 @@ if __name__ == "__main__":
         strategy=strategy,
         ray_init_args=ray_config,
     )
+    save_history(hist, name = MODEL_NAME.split('/')[-1])
+    ray.shutdown()
