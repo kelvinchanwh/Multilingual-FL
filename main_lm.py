@@ -96,8 +96,8 @@ TOP_N_SCORES = []
 GLOBAL_LANG_MAP = None
 
 def save_history(hist, name):
-  time = int(datetime.now(datetime.timezone.utc).timestamp())
-  with open( BIG_FILE_CACHE / "histories" / f"hist_{time}_{name}.json", "w", encoding="utf-8") as f:
+  time = int(datetime.datetime.now(datetime.timezone.utc).timestamp())
+  with open( f"{BIG_FILE_CACHE}/hist_{CACHE_STR}_{time}_{name}.json", "w", encoding="utf-8") as f:
             json.dump(hist.__dict__, f, ensure_ascii=False, indent=4)
 
 # borrowed from Pytorch quickstart example
