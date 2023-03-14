@@ -175,7 +175,7 @@ def test(net, testloader, device: str, get_accuracy: bool = False):
                     labels_to_accuracies[batch["langs"][0].item()]["correct"] = 0
                     labels_to_accuracies[batch["langs"][0].item()]["total"] = 0
                 labels_to_accuracies[batch["langs"][0].item()]["correct"] += torch.sum(torch.eq(pred_labels, truth_labels)).item()
-                labels_to_accuracies[batch["langs"][0].item()]["total"] += len(testloader.dataset)
+                labels_to_accuracies[batch["langs"][0].item()]["total"] += len(pred_labels)
             except Exception as e:
                 print(f"Cant make lang ppls unless entire batch is the same: use a round num for batch size: {e}")
             losses.append(loss.repeat(len(batch)))
